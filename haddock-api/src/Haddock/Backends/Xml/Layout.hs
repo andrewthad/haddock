@@ -14,7 +14,7 @@ module Haddock.Backends.Xml.Layout (
   miniBody,
 
   divPackageHeader, divContent, divModuleHeader, divFooter,
-  divTableOfContents, divDescription, divSynopsis, divInterface,
+  divDescription, divSynopsis, divInterface,
   divIndex, divAlphabet, divModuleList,
 
   sectionName,
@@ -39,16 +39,16 @@ module Haddock.Backends.Xml.Layout (
 ) where
 
 
-import Haddock.Backends.Xml.DocMarkup
-import Haddock.Backends.Xml.Types
-import Haddock.Backends.Xml.Utils
-import Haddock.Types
-import Haddock.Utils (makeAnchorId)
-import qualified Data.Map as Map
-import Text.XHtml hiding ( name, title, p, quote )
+import qualified Data.Map                       as Map
+import           Haddock.Backends.Xml.DocMarkup
+import           Haddock.Backends.Xml.Types
+import           Haddock.Backends.Xml.Utils
+import           Haddock.Types
+import           Haddock.Utils                  (makeAnchorId)
+import           Text.XHtml                     hiding (name, p, quote, title)
 
-import FastString            ( unpackFS )
-import GHC
+import           FastString                     (unpackFS)
+import           GHC
 
 --------------------------------------------------------------------------------
 -- * Sections of the document
@@ -75,7 +75,7 @@ nonEmptySectionName c = paragraph ! [theclass "caption"] $ c
 
 
 divPackageHeader, divContent, divModuleHeader, divFooter,
-  divTableOfContents, divDescription, divSynopsis, divInterface,
+  divDescription, divSynopsis, divInterface,
   divIndex, divAlphabet, divModuleList
     :: Html -> Html
 
@@ -83,10 +83,9 @@ divPackageHeader    = sectionDiv "package-header"
 divContent          = sectionDiv "content"
 divModuleHeader     = sectionDiv "module-header"
 divFooter           = sectionDiv "footer"
-divTableOfContents  = sectionDiv "table-of-contents"
 divDescription      = sectionDiv "description"
 divSynopsis         = sectionDiv "synopsis"
-divInterface        = sectionDiv "interface"
+divInterface        = tag "interface"
 divIndex            = sectionDiv "index"
 divAlphabet         = sectionDiv "alphabet"
 divModuleList       = sectionDiv "module-list"
@@ -124,19 +123,37 @@ divSubDecls cssClass captionName = maybe noHtml wrap
     subCaption = paragraph ! [theclass "caption"] << captionName
 
 
-subDlist :: Qualification -> [SubDecl] -> Maybe Html
-subDlist _ [] = Nothing
-subDlist qual decls = Just $ ulist << map subEntry decls
+subDlist :: Qualification -> [SubDecl] -> Html
+subDlist _ [] = noHtml
+subDlist qual decls = foldMap subEntry decls
   where
     subEntry (decl, mdoc, subs) =
-      li <<
-        (define ! [theclass "src"] << decl +++
-         docElement thediv << (fmap (docToHtml Nothing qual) mdoc +++ subs))
+        (tag "name-with-signature" << decl +++
+         tag "notes" << (fmap (docToHtml Nothing qual) mdoc +++ subs))
 
+subArgumentsInner :: Qualification -> [SubDecl] -> Html
+subArgumentsInner _ [] = noHtml
+subArgumentsInner qual decls = tag "argument" << (concatMap subRow decls)
+  where
+    subRow (decl, mdoc, subs) =
+      (tag "name" << decl)
+       -- <->
+       -- docElement td << fmap (docToHtml Nothing qual) mdoc)
+      : subs
+
+subTable' :: Qualification -> [SubDecl] -> Html
+subTable' _ [] = noHtml
+subTable' qual decls = tag "constructor" << (concatMap subRow decls)
+  where
+    subRow (decl, mdoc, subs) =
+      (tag "name" << decl)
+       -- <->
+       -- docElement td << fmap (docToHtml Nothing qual) mdoc)
+      : subs
 
 subTable :: Qualification -> [SubDecl] -> Maybe Html
 subTable _ [] = Nothing
-subTable qual decls = Just $ table << aboves (concatMap subRow decls)
+subTable qual decls = Just $ tag "constructor" << (concatMap subRow decls)
   where
     subRow (decl, mdoc, subs) =
       (td ! [theclass "src"] << decl
@@ -167,19 +184,18 @@ subBlock hs = Just $ toHtml hs
 
 
 subArguments :: Qualification -> [SubDecl] -> Html
-subArguments qual = divSubDecls "arguments" "Arguments" . subTable qual
-
+subArguments qual = tag "arguments" . subArgumentsInner qual
 
 subAssociatedTypes :: [Html] -> Html
 subAssociatedTypes = divSubDecls "associated-types" "Associated Types" . subBlock
 
 
 subConstructors :: Qualification -> [SubDecl] -> Html
-subConstructors qual = divSubDecls "constructors" "Constructors" . subTable qual
+subConstructors qual = tag "constructors" . subTable' qual
 
 
 subFields :: Qualification -> [SubDecl] -> Html
-subFields qual = divSubDecls "fields" "Fields" . subDlist qual
+subFields qual = tag "fields" . subDlist qual
 
 
 subEquations :: Qualification -> [SubDecl] -> Html
@@ -199,7 +215,7 @@ subInstances qual nm lnks splice = maybe noHtml wrap . instTable
     subCaption = paragraph ! collapseControl id_ True "caption" << "Instances"
     id_ = makeAnchorId $ "i:" ++ nm
 
- 
+
 subInstHead :: String -- ^ Instance unique id (for anchor generation)
             -> Html -- ^ Header content (instance name and type)
             -> Html

@@ -19,19 +19,58 @@ module Haddock.Backends.Xml.DocMarkup (
   docElement, docSection, docSection_,
 ) where
 
-import Data.List
-import Haddock.Backends.Xml.Names
-import Haddock.Backends.Xml.Utils
-import Haddock.Types
-import Haddock.Utils
-import Haddock.Doc (combineDocumentation, emptyMetaDoc,
-                    metaDocAppend, metaConcat)
+import           Data.List
+import           Haddock.Backends.Xml.Names
+import           Haddock.Backends.Xml.Utils
+import           Haddock.Doc                (combineDocumentation, emptyMetaDoc,
+                                             metaConcat, metaDocAppend)
+import           Haddock.Types
+import           Haddock.Utils
 
-import Text.XHtml hiding ( name, p, quote )
-import Data.Maybe (fromMaybe)
+import           Data.Maybe                 (fromMaybe)
+import           Text.XHtml                 hiding (name, p, quote)
 
-import GHC
-import Name
+import           GHC
+import           Name
+
+parPlainMarkup :: Qualification -> (a -> Html) -> DocMarkup a Html
+parPlainMarkup qual ppId = Markup {
+  markupEmpty                = noHtml,
+  markupString               = toHtml,
+  markupParagraph            = tag "paragraph",
+  markupAppend               = (+++),
+  markupIdentifier           = ppId,
+  markupIdentifierUnchecked  = thecode . ppUncheckedLink qual,
+  markupModule               = \m -> let (mdl,ref) = break (=='#') m
+                                         -- Accomodate for old style
+                                         -- foo\#bar anchors
+                                         mdl' = case reverse mdl of
+                                           '\\':_ -> init mdl
+                                           _ -> mdl
+                                     in ppModuleRef (mkModuleName mdl') ref,
+  markupWarning              = thediv ! [theclass "warning"],
+  markupEmphasis             = id,
+  markupBold                 = id,
+  markupMonospaced           = id,
+  markupUnorderedList        = unordList,
+  markupOrderedList          = ordList,
+  markupDefList              = defList,
+  markupCodeBlock            = pre,
+  markupHyperlink            = \(Hyperlink url mLabel) -> toHtml $ fromMaybe url mLabel,
+  markupAName                = \aname -> noHtml,
+  markupPic                  = \(Picture uri t) -> image ! ([src uri] ++ fromMaybe [] (return . title <$> t)),
+  markupProperty             = pre . toHtml,
+  markupExample              = examplesToHtml,
+  markupHeader               = \(Header l t) -> t
+  }
+  where
+    examplesToHtml l = pre (concatHtml $ map exampleToHtml l) ! [theclass "screen"]
+
+    exampleToHtml (Example expression result) = htmlExample
+      where
+        htmlExample = htmlPrompt +++ htmlExpression +++ toHtml (unlines result)
+        htmlPrompt = (thecode . toHtml $ ">>> ") ! [theclass "prompt"]
+        htmlExpression = (strong . thecode . toHtml $ expression ++ "\n") ! [theclass "userinput"]
 
 parHtmlMarkup :: Qualification -> Bool
               -> (Bool -> a -> Html) -> DocMarkup a Html
@@ -197,6 +236,12 @@ docToHtml :: Maybe String -- ^ Name of the thing this doc is for. See
 docToHtml n qual = markupHacked fmt n . cleanup
   where fmt = parHtmlMarkup qual True (ppDocName qual Raw)
 
+docToPlain:: Maybe String -- ^ Name of the thing this doc is for. See
+                          -- comments on 'toHack' for details.
+          -> Qualification -> MDoc DocName -> Html
+docToPlain n qual = markupHacked fmt n . cleanup
+  where fmt = parPlainMarkup qual (ppDocName qual Raw False)
+
 -- | Same as 'docToHtml' but it doesn't insert the 'anchor' element
 -- in links. This is used to generate the Contents box elements.
 docToHtmlNoAnchors :: Maybe String -- ^ See 'toHack'
@@ -226,7 +271,8 @@ docSection n qual = maybe noHtml (docSection_ n qual) . combineDocumentation
 docSection_ :: Maybe Name -- ^ Name of the thing this doc is for
             -> Qualification -> MDoc DocName -> Html
 docSection_ n qual =
-  (docElement thediv <<) . docToHtml (getOccString <$> n) qual
+  (tag "notes" <<) . docToPlain (getOccString <$> n) qual
+  -- (tag "notes" <<) . docToHtml (getOccString <$> n) qual
 
 
 cleanup :: MDoc a -> MDoc a

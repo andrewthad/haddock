@@ -29,16 +29,17 @@ module Haddock.Backends.Xml.Utils (
 ) where
 
 
-import Haddock.Utils
+import           Haddock.Utils
 
-import Data.Maybe
+import           Data.Maybe
 
-import Text.XHtml hiding ( name, title, p, quote )
-import qualified Text.XHtml as XHtml
+import           Text.XHtml    hiding (name, p, quote, title)
+import qualified Text.XHtml    as XHtml
 
-import GHC      ( SrcSpan(..), srcSpanStartLine, Name )
-import Module   ( Module, ModuleName, moduleName, moduleNameString )
-import Name     ( getOccString, nameOccName, isValOcc )
+import           GHC           (Name, SrcSpan (..), srcSpanStartLine)
+import           Module        (Module, ModuleName, moduleName,
+                                moduleNameString)
+import           Name          (getOccString, isValOcc, nameOccName)
 
 
 -- | Replace placeholder string elements with provided values.
@@ -56,7 +57,7 @@ spliceURL mfile mmod = spliceURL' mfile (moduleName <$> mmod)
 -- | Same as 'spliceURL' but takes 'ModuleName' instead of 'Module'.
 spliceURL' :: Maybe FilePath -> Maybe ModuleName -> Maybe GHC.Name ->
               Maybe SrcSpan -> String -> String
-spliceURL' maybe_file maybe_mod maybe_name maybe_loc = run
+spliceURL' maybe_file maybe_mod maybe_name maybe_loc = ("EXTRA-THING:" ++) . run
  where
   file = fromMaybe "" maybe_file
   mdl = case maybe_mod of
@@ -104,7 +105,7 @@ spliceURL' maybe_file maybe_mod maybe_name maybe_loc = run
 
 -- should probably fix the debug case
 renderToString :: Bool -> Html -> String
-renderToString _debug html = showHtmlFragment 
+renderToString _debug html = showHtmlFragment
   (tag "xml" << [html])
 
 

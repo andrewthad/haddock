@@ -17,19 +17,20 @@ module Haddock.Backends.Xml.Names (
 ) where
 
 
-import Haddock.Backends.Xml.Utils
-import Haddock.GhcUtils
-import Haddock.Types
-import Haddock.Utils
+import           Haddock.Backends.Xml.Utils
+import           Haddock.GhcUtils
+import           Haddock.Types
+import           Haddock.Utils
 
-import Text.XHtml hiding ( name, title, p, quote )
-import qualified Data.Map as M
-import qualified Data.List as List
+import qualified Data.List                  as List
+import qualified Data.Map                   as M
+import           Text.XHtml                 hiding (name, p, quote, title)
 
-import GHC
-import Name
-import RdrName
-import FastString (unpackFS)
+import           FastString                 (unpackFS)
+import           GHC
+import           Module                     (packageKeyString)
+import           Name
+import           RdrName
 
 
 -- | Indicator of how to render a 'DocName' into 'Html'
@@ -61,9 +62,13 @@ ppDocName :: Qualification -> Notation -> Bool -> DocName -> Html
 ppDocName qual notation insertAnchors docName =
   case docName of
     Documented name mdl ->
-      linkIdOcc mdl (Just (nameOccName name)) insertAnchors
-      << ppQualifyName qual notation name mdl
-    Undocumented name
+      tag "type" !
+        [ strAttr "module" (moduleNameString . moduleName . nameModule $ name)
+        , strAttr "package" (packageKeyString . modulePackageKey $ mdl)
+        ] << (toHtml $ getOccString name) -- nameModule name
+      -- linkIdOcc mdl (Just (nameOccName name)) insertAnchors
+      -- << ppQualifyName qual notation name mdl
+    Undocumented name -- tag "type" (toHtml "thing") -- nameModule name
       | isExternalName name || isWiredInName name ->
           ppQualifyName qual notation name (nameModule name)
       | otherwise -> ppName notation name
@@ -109,22 +114,22 @@ ppName :: Notation -> Name -> Html
 ppName notation name = wrapInfix notation (getOccName name) $ toHtml (getOccString name)
 
 
-ppBinder :: Bool -> OccName -> Html
+ppBinder :: OccName -> Html
 ppBinder = ppBinderWith Prefix
 
-ppBinderInfix :: Bool -> OccName -> Html
+ppBinderInfix :: OccName -> Html
 ppBinderInfix = ppBinderWith Infix
 
-ppBinderWith :: Notation -> Bool -> OccName -> Html
+ppBinderWith :: Notation -> OccName -> Html
 -- 'isRef' indicates whether this is merely a reference from another part of
 -- the documentation or is the actual definition; in the latter case, we also
 -- set the 'id' and 'class' attributes.
-ppBinderWith notation isRef n =
-  linkedAnchor name ! attributes << ppBinder' notation n
-  where
-    name = nameAnchorId n
-    attributes | isRef     = []
-               | otherwise = [identifier name, theclass "def"]
+ppBinderWith notation n = ppBinder' notation n
+  -- linkedAnchor name ! attributes << ppBinder' notation n
+  -- where
+  --   name = nameAnchorId n
+  --   attributes | isRef     = []
+  --              | otherwise = [identifier name, theclass "def"]
 
 ppBinder' :: Notation -> OccName -> Html
 ppBinder' notation n = wrapInfix notation n $ ppOccName n

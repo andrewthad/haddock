@@ -18,37 +18,38 @@ module Haddock.Backends.Xml (
 ) where
 
 
-import Prelude hiding (div)
+import           Prelude                        hiding (div)
 
-import Haddock.Backends.Xml.Decl
-import Haddock.Backends.Xml.DocMarkup
-import Haddock.Backends.Xml.Layout
-import Haddock.Backends.Xml.Names
-import Haddock.Backends.Xml.Types
-import Haddock.Backends.Xml.Utils
-import Haddock.ModuleTree
-import Haddock.Types
-import Haddock.Version
-import Haddock.Utils
-import Text.XHtml hiding ( name, title, p, quote )
-import Haddock.GhcUtils
+import           Haddock.Backends.Xml.Decl
+import           Haddock.Backends.Xml.DocMarkup
+import           Haddock.Backends.Xml.Layout
+import           Haddock.Backends.Xml.Names
+import           Haddock.Backends.Xml.Types
+import           Haddock.Backends.Xml.Utils
+import           Haddock.GhcUtils
+import           Haddock.ModuleTree
+import           Haddock.Types
+import           Haddock.Utils
+import           Haddock.Version
+import           Text.XHtml                     hiding (name, p, quote, title)
 
-import Control.Monad         ( when, unless )
-import Data.Char             ( toUpper )
-import Data.List             ( sortBy, groupBy, intercalate, isPrefixOf )
-import Data.Maybe
-import System.FilePath hiding ( (</>) )
-import System.Directory
-import Data.Map              ( Map )
-import qualified Data.Map as Map hiding ( Map )
-import qualified Data.Set as Set hiding ( Set )
-import Data.Function
-import Data.Ord              ( comparing )
+import           Control.Monad                  (unless, when)
+import           Data.Char                      (toUpper)
+import           Data.Function
+import           Data.List                      (groupBy, intercalate,
+                                                 isPrefixOf, sortBy)
+import           Data.Map                       (Map)
+import qualified Data.Map                       as Map hiding (Map)
+import           Data.Maybe
+import           Data.Ord                       (comparing)
+import qualified Data.Set                       as Set hiding (Set)
+import           System.Directory
+import           System.FilePath                hiding ((</>))
 
-import DynFlags (Language(..))
-import GHC hiding ( NoLink, moduleInfo )
-import Name
-import Module
+import           DynFlags                       (Language (..))
+import           GHC                            hiding (NoLink, moduleInfo)
+import           Module
+import           Name
 
 --------------------------------------------------------------------------------
 -- * Generating HTML documentation
@@ -90,7 +91,7 @@ ppXml  dflags doctitle maybe_package ifaces odir prologue
       maybe_contents_url maybe_source_url maybe_wiki_url
       (map toInstalledIface visible_ifaces) debug
 
-  mapM_ (ppXmlModule odir doctitle 
+  mapM_ (ppXmlModule odir doctitle
            maybe_source_url maybe_wiki_url
            maybe_contents_url maybe_index_url unicode qual debug) visible_ifaces
 
@@ -107,18 +108,8 @@ headXml :: String -> Maybe String -> Html
 headXml docTitle miniPage =
   header << [
     meta ! [httpequiv "Content-Type", content "text/html; charset=UTF-8"],
-    thetitle << docTitle,
-    script ! [src jsFile, thetype "text/javascript"] << noHtml,
-    script ! [thetype "text/javascript"]
-        -- NB: Within XHTML, the content of script tags needs to be
-        -- a <![CDATA[ section. Will break if the miniPage name could
-        -- have "]]>" in it!
-      << primHtml (
-          "//<![CDATA[\nwindow.onload = function () {pageLoad();"
-          ++ setSynopsis ++ "};\n//]]>\n")
+    thetitle << docTitle
     ]
-  where
-    setSynopsis = maybe "" (\p -> "setSynopsis(\"" ++ p ++ "\");") miniPage
 
 
 srcButton :: SourceURLs -> Maybe Interface -> Maybe Html
@@ -188,41 +179,29 @@ moduleInfo iface =
    let
       info = ifaceInfo iface
 
-      doOneEntry :: (String, HaddockModInfo GHC.Name -> Maybe String) -> Maybe HtmlTable
+      doOneEntry :: (String, HaddockModInfo GHC.Name -> Maybe String) -> Maybe Html
       doOneEntry (fieldName, field) =
-        field info >>= \a -> return (th << fieldName <-> td << a)
+        field info >>= \a -> return (tag fieldName << a)
 
-      entries :: [HtmlTable]
+      entries :: [Html]
       entries = mapMaybe doOneEntry [
-          ("Copyright",hmi_copyright),
-          ("License",hmi_license),
-          ("Maintainer",hmi_maintainer),
-          ("Stability",hmi_stability),
-          ("Portability",hmi_portability),
-          ("Safe Haskell",hmi_safety),
-          ("Language", lg)
-          ] ++ extsForm
+          ("copyright",hmi_copyright),
+          ("license",hmi_license),
+          ("maintainer",hmi_maintainer),
+          ("stability",hmi_stability),
+          ("portability",hmi_portability),
+          ("safe-haskell",hmi_safety),
+          ("language", lg)
+          ]
         where
           lg inf = case hmi_language inf of
             Nothing -> Nothing
             Just Haskell98 -> Just "Haskell98"
             Just Haskell2010 -> Just "Haskell2010"
-
-          extsForm
-            | OptShowExtensions `elem` ifaceOptions iface =
-              let fs = map (dropOpt . show) (hmi_extensions info)
-              in case map stringToHtml fs of
-                [] -> []
-                [x] -> extField x -- don't use a list for a single extension
-                xs -> extField $ unordList xs ! [theclass "extension-list"]
-            | otherwise = []
-            where
-              extField x = return $ th << "Extensions" <-> td << x
-              dropOpt x = if "Opt_" `isPrefixOf` x then drop 4 x else x
    in
       case entries of
          [] -> noHtml
-         _ -> table ! [theclass "info"] << aboves entries
+         _ -> tag "info" << entries
 
 
 --------------------------------------------------------------------------------
@@ -359,7 +338,7 @@ ppXmlIndex :: FilePath
             -> [InstalledInterface]
             -> Bool
             -> IO ()
-ppXmlIndex odir doctitle _maybe_package 
+ppXmlIndex odir doctitle _maybe_package
   maybe_contents_url maybe_source_url maybe_wiki_url ifaces debug = do
   let html = indexPage split_indices Nothing
               (if split_indices then [] else index)
@@ -470,7 +449,7 @@ ppXmlIndex odir doctitle _maybe_package
 
 
 --------------------------------------------------------------------------------
--- * Generate the HTML page for a module
+-- * Generate the XML page for a module
 --------------------------------------------------------------------------------
 
 
@@ -479,7 +458,7 @@ ppXmlModule
         -> SourceURLs -> WikiURLs
         -> Maybe String -> Maybe String -> Bool -> QualOption
         -> Bool -> Interface -> IO ()
-ppXmlModule odir doctitle 
+ppXmlModule odir doctitle
   maybe_source_url maybe_wiki_url
   maybe_contents_url maybe_index_url unicode qual debug iface = do
   let
@@ -493,31 +472,15 @@ ppXmlModule odir doctitle
           maybe_source_url maybe_wiki_url
           maybe_contents_url maybe_index_url << [
             divModuleHeader << (moduleInfo iface +++ (sectionName << mdl_str)),
-            ifaceToHtml maybe_source_url maybe_wiki_url iface unicode real_qual
+            ifaceToXml maybe_source_url maybe_wiki_url iface unicode real_qual
           ]
 
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, moduleXmlFile mdl]) (renderToString debug html)
-  ppXmlModuleMiniSynopsis odir doctitle iface unicode real_qual debug
 
-ppXmlModuleMiniSynopsis :: FilePath -> String
-  -> Interface -> Bool -> Qualification -> Bool -> IO ()
-ppXmlModuleMiniSynopsis odir _doctitle iface unicode qual debug = do
-  let mdl = ifaceMod iface
-      html =
-        headXml (moduleString mdl) Nothing +++
-        miniBody <<
-          (divModuleHeader << sectionName << moduleString mdl +++
-           miniSynopsis mdl iface unicode qual)
-  createDirectoryIfMissing True odir
-  writeFile (joinPath [odir, "mini_" ++ moduleXmlFile mdl]) (renderToString debug html)
-
-
-ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> Bool -> Qualification -> Html
-ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
-  = ppModuleContents qual exports +++
-    description +++
-    synopsis +++
+ifaceToXml :: SourceURLs -> WikiURLs -> Interface -> Bool -> Qualification -> Html
+ifaceToXml maybe_source_url maybe_wiki_url iface unicode qual
+  = description +++
     divInterface (maybe_doc_hdr +++ bdy)
   where
     exports = numberSectionHeadings (ifaceRnExportItems iface)
@@ -535,16 +498,6 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
                 | otherwise    = divDescription $ sectionName << "Description" +++ doc
                 where doc = docSection Nothing qual (ifaceRnDoc iface)
 
-        -- omit the synopsis if there are no documentation annotations at all
-    synopsis
-      | no_doc_at_all = noHtml
-      | otherwise
-      = divSynopsis $
-            paragraph ! collapseControl "syn" False "caption" << "Synopsis" +++
-            shortDeclList (
-                mapMaybe (processExport True linksInfo unicode qual) exports
-            ) ! (collapseSection "syn" False "" ++ collapseToggle "syn")
-
         -- if the documentation doesn't begin with a section header, then
         -- add one ("Documentation").
     maybe_doc_hdr
@@ -560,30 +513,6 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
     linksInfo = (maybe_source_url, maybe_wiki_url)
 
 
-miniSynopsis :: Module -> Interface -> Bool -> Qualification -> Html
-miniSynopsis mdl iface unicode qual =
-    divInterface << concatMap (processForMiniSynopsis mdl unicode qual) exports
-  where
-    exports = numberSectionHeadings (ifaceRnExportItems iface)
-
-
-processForMiniSynopsis :: Module -> Bool -> Qualification -> ExportItem DocName
-                       -> [Html]
-processForMiniSynopsis mdl unicode qual ExportDecl { expItemDecl = L _loc decl0 } =
-  ((divTopDecl <<).(declElem <<)) <$> case decl0 of
-    TyClD d -> let b = ppTyClBinderWithVarsMini mdl d in case d of
-        (FamDecl decl)    -> [ppTyFamHeader True False decl unicode qual]
-        (DataDecl{})   -> [keyword "data" <+> b]
-        (SynDecl{})    -> [keyword "type" <+> b]
-        (ClassDecl {}) -> [keyword "class" <+> b]
-    SigD (TypeSig lnames (L _ _) _) ->
-      map (ppNameMini Prefix mdl . nameOccName . getName . unLoc) lnames
-    _ -> []
-processForMiniSynopsis _ _ qual (ExportGroup lvl _id txt) =
-  [groupTag lvl << docToHtml Nothing qual (mkMeta txt)]
-processForMiniSynopsis _ _ _ _ = []
-
-
 ppNameMini :: Notation -> Module -> OccName -> Html
 ppNameMini notation mdl nm =
     anchor ! [ href (moduleNameUrl mdl nm)
@@ -597,31 +526,6 @@ ppTyClBinderWithVarsMini mdl decl =
       ns = tyvarNames $ tcdTyVars decl -- it's safe to use tcdTyVars, see code above
   in ppTypeApp n [] ns (\is_infix -> ppNameMini is_infix mdl . nameOccName . getName) ppTyName
 
-ppModuleContents :: Qualification -> [ExportItem DocName] -> Html
-ppModuleContents qual exports
-  | null sections = noHtml
-  | otherwise     = contentsDiv
- where
-  contentsDiv = divTableOfContents << (
-    sectionName << "Contents" +++
-    unordList sections)
-
-  (sections, _leftovers{-should be []-}) = process 0 exports
-
-  process :: Int -> [ExportItem DocName] -> ([Html],[ExportItem DocName])
-  process _ [] = ([], [])
-  process n items@(ExportGroup lev id0 doc : rest)
-    | lev <= n  = ( [], items )
-    | otherwise = ( html:secs, rest2 )
-    where
-      html = linkedAnchor (groupId id0)
-             << docToHtmlNoAnchors (Just id0) qual (mkMeta doc) +++ mk_subsections ssecs
-      (ssecs, rest1) = process lev rest
-      (secs,  rest2) = process n   rest1
-  process n (_ : rest) = process n rest
-
-  mk_subsections [] = noHtml
-  mk_subsections ss = unordList ss
 
 -- we need to assign a unique id to each section heading so we can hyperlink
 -- them from the contents:

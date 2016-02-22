@@ -1,5 +1,11 @@
 # Haddock, a Haskell Documentation Tool
 
+## Custom Branch
+
+You need to run this command (or some slight variant of it) to get 
+cabal to do the right thing:
+
+    cabal --verbose --with-haddock=/home/andrew/.local/bin/haddock --haddock-options=--xml haddock
 
 #### About haddock
 
