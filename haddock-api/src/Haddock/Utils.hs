@@ -24,6 +24,10 @@ module Haddock.Utils (
   moduleIndexFrameName, mainFrameName, synopsisFrameName,
   subIndexHtmlFile,
   jsFile, framesFile,
+  moduleXmlFile, moduleXmlFile',
+  contentsXmlFile, indexXmlFile,
+  frameIndexXmlFile,
+  subIndexXmlFile,
 
   -- * Anchor and URL utilities
   moduleNameUrl, moduleNameUrl', moduleUrl,
@@ -189,27 +193,38 @@ emptyHsQTvs = HsQTvs { hsq_kvs = error "haddock:emptyHsQTvs", hsq_tvs = [] }
 baseName :: ModuleName -> FilePath
 baseName = map (\c -> if c == '.' then '-' else c) . moduleNameString
 
-
-moduleHtmlFile :: Module -> FilePath
-moduleHtmlFile mdl =
+moduleSomeFile :: String -> Module -> FilePath
+moduleSomeFile ext mdl = 
   case Map.lookup mdl html_xrefs of
-    Nothing  -> baseName mdl' ++ ".html"
-    Just fp0 -> HtmlPath.joinPath [fp0, baseName mdl' ++ ".html"]
+    Nothing  -> baseName mdl' ++ "." ++ ext
+    Just fp0 -> HtmlPath.joinPath [fp0, baseName mdl' ++ "." ++ ext]
   where
    mdl' = moduleName mdl
 
+moduleHtmlFile :: Module -> FilePath
+moduleHtmlFile = moduleSomeFile "html"
+
+moduleXmlFile :: Module -> FilePath
+moduleXmlFile = moduleSomeFile "xml"
+
+moduleSomeFile' :: String -> ModuleName -> FilePath
+moduleSomeFile' ext mdl =
+  case Map.lookup mdl html_xrefs' of
+    Nothing  -> baseName mdl ++ "." ++ ext
+    Just fp0 -> HtmlPath.joinPath [fp0, baseName mdl ++ "." ++ ext]
 
 moduleHtmlFile' :: ModuleName -> FilePath
-moduleHtmlFile' mdl =
-  case Map.lookup mdl html_xrefs' of
-    Nothing  -> baseName mdl ++ ".html"
-    Just fp0 -> HtmlPath.joinPath [fp0, baseName mdl ++ ".html"]
+moduleHtmlFile' = moduleSomeFile' "html"
+
+moduleXmlFile' :: ModuleName -> FilePath
+moduleXmlFile' = moduleSomeFile' "xml"
 
 
-contentsHtmlFile, indexHtmlFile :: String
+contentsHtmlFile, indexHtmlFile, contentsXmlFile, indexXmlFile :: String
 contentsHtmlFile = "index.html"
 indexHtmlFile = "doc-index.html"
-
+contentsXmlFile = "index.xml"
+indexXmlFile = "doc-index.xml"
 
 -- | The name of the module index file to be displayed inside a frame.
 -- Modules are display in full, but without indentation.  Clicking opens in
@@ -217,6 +232,8 @@ indexHtmlFile = "doc-index.html"
 frameIndexHtmlFile :: String
 frameIndexHtmlFile = "index-frames.html"
 
+frameIndexXmlFile :: String
+frameIndexXmlFile = "index-frames.xml"
 
 moduleIndexFrameName, mainFrameName, synopsisFrameName :: String
 moduleIndexFrameName = "modules"
@@ -224,11 +241,16 @@ mainFrameName = "main"
 synopsisFrameName = "synopsis"
 
 
-subIndexHtmlFile :: String -> String
-subIndexHtmlFile ls = "doc-index-" ++ b ++ ".html"
+subIndexSomeFile :: String -> String -> String
+subIndexSomeFile ext ls = "doc-index-" ++ b ++ "." ++ ext
    where b | all isAlpha ls = ls
            | otherwise = concatMap (show . ord) ls
 
+subIndexHtmlFile :: String -> String
+subIndexHtmlFile = subIndexSomeFile "html"
+
+subIndexXmlFile :: String -> String
+subIndexXmlFile = subIndexSomeFile "xml"
 
 -------------------------------------------------------------------------------
 -- * Anchor and URL utilities

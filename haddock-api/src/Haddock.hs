@@ -26,6 +26,7 @@ module Haddock (
 ) where
 
 import Data.Version
+import Haddock.Backends.Xml
 import Haddock.Backends.Xhtml
 import Haddock.Backends.Xhtml.Themes (getThemes)
 import Haddock.Backends.LaTeX
@@ -312,6 +313,14 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
                 opt_contents_url opt_index_url unicode qual
                 pretty
     copyHtmlBits odir libDir themes
+
+  when (Flag_Xml `elem` flags) $ do
+    ppXml dflags title pkgStr visibleIfaces odir
+                prologue
+                sourceUrls' opt_wiki_urls
+                opt_contents_url opt_index_url unicode qual
+                pretty
+    copyXmlBits odir libDir
 
   -- TODO: we throw away Meta for both Hoogle and LaTeX right now,
   -- might want to fix that if/when these two get some work on them

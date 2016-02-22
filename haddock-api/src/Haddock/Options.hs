@@ -54,6 +54,7 @@ data Flag
   | Flag_DumpInterface String
   | Flag_Heading String
   | Flag_Html
+  | Flag_Xml
   | Flag_Hoogle
   | Flag_Lib String
   | Flag_OutputDir FilePath
@@ -114,6 +115,8 @@ options backwardsCompat =
 --  "output in DocBook XML",
     Option ['h']  ["html"]     (NoArg Flag_Html)
       "output in HTML (XHTML 1.0)",
+    Option [] ["xml"]      (NoArg Flag_Xml)
+      "output in XML",
     Option []  ["latex"]  (NoArg Flag_LaTeX) "use experimental LaTeX rendering",
     Option []  ["latex-style"]  (ReqArg Flag_LaTeXStyle "FILE") "provide your own LaTeX style in FILE",
     Option ['U'] ["use-unicode"] (NoArg Flag_UseUnicode) "use Unicode in HTML output",

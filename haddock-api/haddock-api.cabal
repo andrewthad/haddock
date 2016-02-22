@@ -80,6 +80,13 @@ library
     Haddock.Backends.Xhtml.Themes
     Haddock.Backends.Xhtml.Types
     Haddock.Backends.Xhtml.Utils
+    Haddock.Backends.Xml
+    Haddock.Backends.Xml.Decl
+    Haddock.Backends.Xml.DocMarkup
+    Haddock.Backends.Xml.Layout
+    Haddock.Backends.Xml.Names
+    Haddock.Backends.Xml.Types
+    Haddock.Backends.Xml.Utils
     Haddock.Backends.LaTeX
     Haddock.Backends.HaddockDB
     Haddock.Backends.Hoogle
@@ -112,6 +119,9 @@ test-suite spec
 
   other-modules:
     Haddock.Backends.Hyperlinker.ParserSpec
+    Haddock.Backends.Hyperlinker.Parser
+    Haddock.Backends.Hyperlinker.Types
+    Haddock.Backends.Hyperlinker
 
   build-depends:
       base >= 4.3 && < 4.9
